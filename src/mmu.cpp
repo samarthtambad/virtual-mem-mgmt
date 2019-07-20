@@ -19,10 +19,11 @@ bool testing = true;
 long rand_ofs = 0;
 vector<long> randvals;
 vector<pte_t> page_table;
-vector<process> processes;
+// vector<process> processes;
 deque<frame_t> frame_table;   // OS maintains this
 deque<frame_t> free_pool;   
 process current_process;
+process *processes;
 
 Pager *pager = (Pager *) new FIFO(&frame_table);
 
@@ -154,15 +155,16 @@ void parse_input(string input_file){
     // read number of processes
     line = get_next_valid_line(in);
     num_processes = stoi(line);
-    process *procs = new process[num_processes];
+    processes = new process[num_processes];
 
     // read num_processes no. of process specs
     for(int i = 0; i < num_processes; i++){
         line = get_next_valid_line(in);
-        procs[i].num_vma = stoi(line);
-        procs[i].vma_specs = new vmaspec[procs[i].num_vma];
-        for(int j = 0; j < procs[i].num_vma; j++){
-            in >> procs[i].vma_specs[j].start_vpage >> procs[i].vma_specs[j].end_vpage >> procs[i].vma_specs[j].write_protected >> procs[i].vma_specs[j].file_mapped;
+        processes[i].num_vma = stoi(line);
+        processes[i].vma_specs = new vmaspec[processes[i].num_vma];
+        processes[i].page_table = new pte_t[NUM_PTE];
+        for(int j = 0; j < processes[i].num_vma; j++){
+            in >> processes[i].vma_specs[j].start_vpage >> processes[i].vma_specs[j].end_vpage >> processes[i].vma_specs[j].write_protected >> processes[i].vma_specs[j].file_mapped;
         }
         in.ignore(numeric_limits<streamsize>::max(), '\n');
     }
@@ -170,37 +172,47 @@ void parse_input(string input_file){
     if(testing){
         printf("num of processes: %d\n", num_processes);
         for(int i = 0; i < num_processes; i++){
-            printf("\t%d : num of vmas: %d\n", i, procs[i].num_vma);
-            for(int j = 0; j < procs[i].num_vma; j++){
-                printf("\t\t%d : %d %d %d %d\n", j, procs[i].vma_specs[j].start_vpage, procs[i].vma_specs[j].end_vpage, procs[i].vma_specs[j].write_protected, procs[i].vma_specs[j].file_mapped);
+            printf("\t%d : num of vmas: %d\n", i, processes[i].num_vma);
+            for(int j = 0; j < processes[i].num_vma; j++){
+                printf("\t\t%d : %d %d %d %d\n", j, processes[i].vma_specs[j].start_vpage, processes[i].vma_specs[j].end_vpage, processes[i].vma_specs[j].write_protected, processes[i].vma_specs[j].file_mapped);
             }
         }   
     }
 
     // parse instructions
     char c;
+    unsigned long long counter = 0;
     while(in >> c){
         int procid, vpage;
         switch(c){
-            case 'c':
+            case 'c':   // context switch
                 in >> procid;
-                if(testing) printf("c %d\n", procid);
+                current_process = processes[procid];
+                printf("%llu: ==> %c %d\n", counter, c, procid);
+                // if(testing) printf("c %d\n", procid);
                 break;
-            case 'r':
+            case 'r':   // read
                 in >> vpage;
-                if(testing) printf("r %d\n", vpage);
+                printf("%llu: ==> %c %d\n", counter, c, vpage);
+                // if present, print zero else pagefault
+                
+                // if(testing) printf("r %d\n", vpage);
                 break;
             case 'w':
                 in >> vpage;
-                if(testing) printf("w %d\n", vpage);
+                printf("%llu: ==> %c %d\n", counter, c, vpage);
+                // if(testing) printf("w %d\n", vpage);
                 break;
             case 'e':
                 in >> procid;
-                if(testing) printf("e %d\n", procid);
+                printf("%llu: ==> %c %d\n", counter, c, procid);
+                // if(testing) printf("e %d\n", procid);
                 break;
             default: break;
         }
         in.ignore(numeric_limits<streamsize>::max(), '\n');
+        printf("count %c: %llu\n",c, counter);
+        counter = counter + 1;
     }
     in.close();
 }

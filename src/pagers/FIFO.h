@@ -21,5 +21,5 @@ FIFO::~FIFO(){
 frame_t* FIFO::select_victim_frame(){
     frame_t f = this->frame_table.front();
     this->frame_table.pop_front();
-    return &f;
+    return nullptr;
 }

@@ -5,6 +5,9 @@
         "limits": "cpp",
         "ios": "cpp",
         "string": "cpp",
-        "new": "cpp"
+        "new": "cpp",
+        "utility": "cpp",
+        "iterator": "cpp",
+        "deque": "cpp"
     }
 }

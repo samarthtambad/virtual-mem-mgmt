@@ -14,11 +14,6 @@ typedef struct {
     // used 12 bits. free to use remaining 20 bits however.
 } pte_t;
 
-typedef struct {
-    std::pair<int, int> rev_map; // <pid, vpage>
-    // helper data
-} frame_t;
-
 typedef struct{
     int start_vpage;
     int end_vpage;
@@ -27,10 +22,44 @@ typedef struct{
 } vmaspec;
 
 typedef struct{
-    int num_vma;
-    vmaspec *vma_specs;
-    pte_t *page_table;
-} process;
+    unsigned long unmaps;
+    unsigned long maps;
+    unsigned long ins;
+    unsigned long outs;
+    unsigned long fins;
+    unsigned long fouts;
+    unsigned long zeroes;
+    unsigned long segv;
+    unsigned long segprot;
+} pstat_t;
+
+class Process
+{
+    public:
+        int pid;
+        int num_vma;
+        vmaspec *vma_specs;
+        pte_t *page_table;
+        pstat_t *stats;
+        Process(int, int);
+        ~Process();
+};
+Process::Process(int pid, int num_vma){
+    this->pid = pid;
+    this->num_vma = num_vma;
+    this->vma_specs = new vmaspec[num_vma];
+    this->page_table = new pte_t[NUM_PTE];
+    this->stats = new pstat_t;
+}
+
+typedef struct {
+    int frame_num;
+    int is_mapped;
+    std::pair<Process*, int> rev_map; // <process, vpage>
+    // helper data
+} frame_t;
 /*--------------------------------------------------------------*/
+
+extern std::deque<frame_t> frame_table; 
 
 #endif

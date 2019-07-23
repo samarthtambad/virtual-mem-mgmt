@@ -21,11 +21,10 @@ vector<long> randvals;
 vector<pte_t> page_table;
 // vector<process> processes;
 deque<frame_t> frame_table;   // OS maintains this
-deque<frame_t> free_pool;   
-process current_process;
-process *processes;
+deque<frame_t*> free_pool;   
+Process *current_process;
 
-Pager *pager = (Pager *) new FIFO(&frame_table);
+Pager *pager = (Pager *) new FIFO();
 
 
 void parse_random(string rand_file){
@@ -112,12 +111,15 @@ void pagefault_handler(){
 }
 
 frame_t* allocate_frame_from_free_list(){
-    return nullptr;
+    if(free_pool.empty()) return nullptr;
+    frame_t* f = free_pool.front();
+    free_pool.pop_front();
+    return f;
 }
 
 frame_t* get_frame() {
     frame_t *frame = allocate_frame_from_free_list();
-    if (frame == NULL) frame = pager->select_victim_frame();
+    if (frame == nullptr) frame = pager->select_victim_frame();
     return frame;
 }
 
@@ -139,6 +141,13 @@ while (get_next_instruction(&operation, &vpage)) {
 }
 */
 
+void print_free_pool(){
+    printf("Free Frames: \n");
+    for(deque<frame_t*>::iterator iter = free_pool.begin(); iter != free_pool.end(); ++iter){
+        printf("frame %d\n", (*iter)->frame_num);
+    }
+}
+
 void parse_input(string input_file){
     
     // read and parse input file
@@ -155,63 +164,107 @@ void parse_input(string input_file){
     // read number of processes
     line = get_next_valid_line(in);
     num_processes = stoi(line);
-    processes = new process[num_processes];
+    // processes = new process[num_processes];
+    vector<Process*> processes;
 
     // read num_processes no. of process specs
+    // for(int i = 0; i < num_processes; i++){
+    //     line = get_next_valid_line(in);
+    //     processes[i].pid = i;
+    //     processes[i].num_vma = stoi(line);
+    //     processes[i].vma_specs = new vmaspec[processes[i].num_vma];
+    //     processes[i].page_table = new pte_t[NUM_PTE];
+    //     for(int j = 0; j < processes[i].num_vma; j++){
+    //         in >> processes[i].vma_specs[j].start_vpage >> processes[i].vma_specs[j].end_vpage >> processes[i].vma_specs[j].write_protected >> processes[i].vma_specs[j].file_mapped;
+    //     }
+    //     in.ignore(numeric_limits<streamsize>::max(), '\n');
+    // }
+
     for(int i = 0; i < num_processes; i++){
         line = get_next_valid_line(in);
-        processes[i].num_vma = stoi(line);
-        processes[i].vma_specs = new vmaspec[processes[i].num_vma];
-        processes[i].page_table = new pte_t[NUM_PTE];
-        for(int j = 0; j < processes[i].num_vma; j++){
-            in >> processes[i].vma_specs[j].start_vpage >> processes[i].vma_specs[j].end_vpage >> processes[i].vma_specs[j].write_protected >> processes[i].vma_specs[j].file_mapped;
+        int num_vma = stoi(line);
+        Process *proc = new Process(i, num_vma);
+        for(int j = 0; j < num_vma; j++){
+            in >> proc->vma_specs[j].start_vpage >> proc->vma_specs[j].end_vpage >> proc->vma_specs[j].write_protected >> proc->vma_specs[j].file_mapped;
         }
         in.ignore(numeric_limits<streamsize>::max(), '\n');
+        processes.push_back(proc);
+        proc = nullptr;
     }
 
     if(testing){
         printf("num of processes: %d\n", num_processes);
         for(int i = 0; i < num_processes; i++){
-            printf("\t%d : num of vmas: %d\n", i, processes[i].num_vma);
-            for(int j = 0; j < processes[i].num_vma; j++){
-                printf("\t\t%d : %d %d %d %d\n", j, processes[i].vma_specs[j].start_vpage, processes[i].vma_specs[j].end_vpage, processes[i].vma_specs[j].write_protected, processes[i].vma_specs[j].file_mapped);
+            printf("\t%d : num of vmas: %d\n", i, processes[i]->num_vma);
+            for(int j = 0; j < processes[i]->num_vma; j++){
+                printf("\t\t%d : %d %d %d %d\n", j, processes[i]->vma_specs[j].start_vpage, processes[i]->vma_specs[j].end_vpage, processes[i]->vma_specs[j].write_protected, processes[i]->vma_specs[j].file_mapped);
             }
-        }   
+        }
     }
+    
+    print_free_pool();
 
     // parse instructions
     char c;
     unsigned long long counter = 0;
     while(in >> c){
+        if(c == '#'){
+            in.ignore(numeric_limits<streamsize>::max(), '\n');
+            continue;
+        }
         int procid, vpage;
         switch(c){
             case 'c':   // context switch
                 in >> procid;
                 current_process = processes[procid];
                 printf("%llu: ==> %c %d\n", counter, c, procid);
-                // if(testing) printf("c %d\n", procid);
                 break;
             case 'r':   // read
                 in >> vpage;
                 printf("%llu: ==> %c %d\n", counter, c, vpage);
-                // if present, print zero else pagefault
-                
-                // if(testing) printf("r %d\n", vpage);
+                if(!current_process->page_table[vpage].VALID){   // not present, pagefault
+                    printf("before get_frame");
+                    frame_t* newframe = get_frame();
+                    printf("after get_frame");
+                    if(newframe->is_mapped){    // unmap old frame
+                        printf("UNMAP %d:%d\n", newframe->rev_map.first->pid, newframe->rev_map.second);
+                        newframe->is_mapped = false;
+                        newframe->rev_map = make_pair(nullptr, -1);
+                    }
+                    printf("ZERO\n");
+                    newframe->is_mapped = true;
+                    newframe->rev_map = make_pair(current_process, vpage);
+                    printf("MAP %d\n", newframe->frame_num);
+
+                    // print_free_pool();
+
+                    // if frame is modified, save it 
+                    
+                }
                 break;
             case 'w':
                 in >> vpage;
                 printf("%llu: ==> %c %d\n", counter, c, vpage);
-                // if(testing) printf("w %d\n", vpage);
+                if(!current_process->page_table[vpage].VALID){   // not present, pagefault
+                    frame_t* newframe = get_frame();
+                    if(newframe->is_mapped){    // unmap old frame
+                        printf("UNMAP %d:%d\n", newframe->rev_map.first->pid, newframe->rev_map.second);
+                        newframe->is_mapped = false;
+                        newframe->rev_map = make_pair(nullptr, -1);
+                    }
+                    printf("ZERO\n");
+                    newframe->is_mapped = true;
+                    newframe->rev_map = make_pair(current_process, vpage);
+                    printf("MAP %d\n", newframe->frame_num);
+                }
                 break;
             case 'e':
                 in >> procid;
                 printf("%llu: ==> %c %d\n", counter, c, procid);
-                // if(testing) printf("e %d\n", procid);
                 break;
             default: break;
         }
         in.ignore(numeric_limits<streamsize>::max(), '\n');
-        printf("count %c: %llu\n",c, counter);
         counter = counter + 1;
     }
     in.close();
@@ -223,7 +276,13 @@ int main(int argc, char *argv[]){
     string input_file, rand_file;
     parse_args(argc, argv, input_file, rand_file);
 
-    
+    for(int i = 0; i < num_frames; i++){
+        frame_t* f = new frame_t;
+        f->frame_num = i;
+        f->is_mapped = false;
+        free_pool.push_back(f);
+    }
+
     parse_random(rand_file);
     parse_input(input_file);
 

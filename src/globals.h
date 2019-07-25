@@ -4,13 +4,14 @@
 #define NUM_PTE 64
 
 /*----------------------Data Structures---------------------- */
-typedef struct {
-    unsigned int VALID:1;             // PRESENT/VALID bit
+typedef struct pte_t{
+    unsigned int PRESENT:1;             // PRESENT/VALID bit
     unsigned int  WRITE_PROTECT:1;
     unsigned int  MODIFIED:1;
     unsigned int  REFERENCED:1;
     unsigned int  PAGEDOUT:1;
     unsigned int INDEX:7;
+    pte_t(): PRESENT(0), WRITE_PROTECT(0), MODIFIED(0), REFERENCED(0), PAGEDOUT(0), INDEX(0){}
     // used 12 bits. free to use remaining 20 bits however.
 } pte_t;
 
@@ -52,14 +53,15 @@ Process::Process(int pid, int num_vma){
     this->stats = new pstat_t;
 }
 
-typedef struct {
+typedef struct frame_t{
     int frame_num;
     int is_mapped;
     std::pair<Process*, int> rev_map; // <process, vpage>
     // helper data
+    frame_t() : is_mapped(false){}
 } frame_t;
 /*--------------------------------------------------------------*/
 
-extern std::deque<frame_t> frame_table; 
+extern std::vector<frame_t> frame_table; 
 
 #endif

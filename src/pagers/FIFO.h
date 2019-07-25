@@ -3,7 +3,7 @@
 class FIFO : public Pager
 {
     private:
-        std::deque<frame_t>::iterator hand;
+        int hand;
     public:
         FIFO();
         ~FIFO();
@@ -11,7 +11,7 @@ class FIFO : public Pager
 };
 
 FIFO::FIFO(){
-    hand = frame_table.begin();
+    hand = 0;
 }
 
 FIFO::~FIFO(){
@@ -19,8 +19,8 @@ FIFO::~FIFO(){
 }
 
 frame_t* FIFO::select_victim_frame(){
-    frame_t* frame = &(*hand);
-    if(hand == frame_table.end()) hand = frame_table.begin();
+    frame_t* frame = &frame_table[hand];
+    if(hand == frame_table.size() - 1) hand = 0;
     else hand++;
     return frame;
 }

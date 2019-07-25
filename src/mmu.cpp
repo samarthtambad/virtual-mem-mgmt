@@ -20,7 +20,7 @@ long rand_ofs = 0;
 vector<long> randvals;
 vector<pte_t> page_table;
 // vector<process> processes;
-deque<frame_t> frame_table;   // OS maintains this
+vector<frame_t> frame_table;   // OS maintains this
 deque<frame_t*> free_pool;   
 Process *current_process;
 
@@ -73,6 +73,7 @@ void parse_args(int argc, char *argv[], string &input_file, string &rand_file){
             case 'f':
                 // int num_frames;
                 num_frames = atoi(optarg);
+                // frame_table.resize(num_frames);
                 if(testing) printf("num_frames: %d\n", num_frames);
                 break;
             case '?':
@@ -106,10 +107,6 @@ string get_next_valid_line(ifstream &fin){
     return line;
 }
 
-void pagefault_handler(){
-
-}
-
 frame_t* allocate_frame_from_free_list(){
     if(free_pool.empty()) return nullptr;
     frame_t* f = free_pool.front();
@@ -123,29 +120,49 @@ frame_t* get_frame() {
     return frame;
 }
 
-/*
-while (get_next_instruction(&operation, &vpage)) {
-    // handle special case of “c” and “e” instruction
-    // now the real instructions for read and write
-    pte_t *pte = &current_process.page_table[vpage];// in reality this is done by hardware
-    if ( ! pte->present) {
-        // this in reality generates the page fault exception and now you execute
-        frame_t *newframe = get_frame();
-        //-> figure out if/what to do with old frame if it was mapped
-        //   see general outline in MM-slides under Lab3 header
-        //   see whether and how to bring in the content of the access page.
-    }
-    // check write protection
-    // simulate instruction execution by hardware by updating the R/M PTE bits
-    update_pte(read/modify) bits based on operations.
-}
-*/
-
 void print_free_pool(){
     printf("Free Frames: \n");
     for(deque<frame_t*>::iterator iter = free_pool.begin(); iter != free_pool.end(); ++iter){
         printf("frame %d\n", (*iter)->frame_num);
     }
+}
+
+void pagefault_handler(pte_t *pte, int vpage){
+    frame_t* newframe = get_frame();
+
+    /*----------unmap old frame and save it if needed----*/
+    if(newframe->is_mapped){    // unmap old frame
+        printf("UNMAP %d:%d\n", newframe->rev_map.first->pid, newframe->rev_map.second);
+        pte_t* old_pte = &newframe->rev_map.first->page_table[newframe->rev_map.second];
+        if(old_pte->REFERENCED){
+
+        }
+        if(old_pte->MODIFIED){  // save changes to disk OUT/FOUT
+            printf("OUT\n");
+        }
+        newframe->is_mapped = false;
+        newframe->rev_map = make_pair(nullptr, -1);
+    }
+    /*----------------------------------------------------*/
+
+
+    /*------zero out the virtual page------*/ 
+    pte->PRESENT = 0;
+    pte->MODIFIED = 0;
+    pte->REFERENCED = 0;
+    // pte->INDEX = -1;
+    // pte->PAGEDOUT = 0;   // to reset or not?
+    printf("ZERO\n");
+    /*-------------------------------------*/
+
+
+    /*-------map newframe to vpage of current_process-----*/
+    pte->PRESENT = 1;
+    pte->INDEX = newframe->frame_num;
+    newframe->is_mapped = true;
+    newframe->rev_map = make_pair(current_process, vpage);
+    printf("MAP %d\n", pte->INDEX);
+    /*----------------------------------------------------*/
 }
 
 void parse_input(string input_file){
@@ -164,21 +181,7 @@ void parse_input(string input_file){
     // read number of processes
     line = get_next_valid_line(in);
     num_processes = stoi(line);
-    // processes = new process[num_processes];
     vector<Process*> processes;
-
-    // read num_processes no. of process specs
-    // for(int i = 0; i < num_processes; i++){
-    //     line = get_next_valid_line(in);
-    //     processes[i].pid = i;
-    //     processes[i].num_vma = stoi(line);
-    //     processes[i].vma_specs = new vmaspec[processes[i].num_vma];
-    //     processes[i].page_table = new pte_t[NUM_PTE];
-    //     for(int j = 0; j < processes[i].num_vma; j++){
-    //         in >> processes[i].vma_specs[j].start_vpage >> processes[i].vma_specs[j].end_vpage >> processes[i].vma_specs[j].write_protected >> processes[i].vma_specs[j].file_mapped;
-    //     }
-    //     in.ignore(numeric_limits<streamsize>::max(), '\n');
-    // }
 
     for(int i = 0; i < num_processes; i++){
         line = get_next_valid_line(in);
@@ -202,10 +205,11 @@ void parse_input(string input_file){
         }
     }
     
-    print_free_pool();
+    // print_free_pool();
 
     // parse instructions
     char c;
+    pte_t *pte;
     unsigned long long counter = 0;
     while(in >> c){
         if(c == '#'){
@@ -221,42 +225,21 @@ void parse_input(string input_file){
                 break;
             case 'r':   // read
                 in >> vpage;
+                pte = &current_process->page_table[vpage];
                 printf("%llu: ==> %c %d\n", counter, c, vpage);
-                if(!current_process->page_table[vpage].VALID){   // not present, pagefault
-                    printf("before get_frame");
-                    frame_t* newframe = get_frame();
-                    printf("after get_frame");
-                    if(newframe->is_mapped){    // unmap old frame
-                        printf("UNMAP %d:%d\n", newframe->rev_map.first->pid, newframe->rev_map.second);
-                        newframe->is_mapped = false;
-                        newframe->rev_map = make_pair(nullptr, -1);
-                    }
-                    printf("ZERO\n");
-                    newframe->is_mapped = true;
-                    newframe->rev_map = make_pair(current_process, vpage);
-                    printf("MAP %d\n", newframe->frame_num);
-
-                    // print_free_pool();
-
-                    // if frame is modified, save it 
-                    
+                if(!pte->PRESENT){   // pagefault
+                    pagefault_handler(pte, vpage);
                 }
+                pte->REFERENCED = 1;
                 break;
-            case 'w':
+            case 'w':   // write
                 in >> vpage;
+                pte = &current_process->page_table[vpage];
                 printf("%llu: ==> %c %d\n", counter, c, vpage);
-                if(!current_process->page_table[vpage].VALID){   // not present, pagefault
-                    frame_t* newframe = get_frame();
-                    if(newframe->is_mapped){    // unmap old frame
-                        printf("UNMAP %d:%d\n", newframe->rev_map.first->pid, newframe->rev_map.second);
-                        newframe->is_mapped = false;
-                        newframe->rev_map = make_pair(nullptr, -1);
-                    }
-                    printf("ZERO\n");
-                    newframe->is_mapped = true;
-                    newframe->rev_map = make_pair(current_process, vpage);
-                    printf("MAP %d\n", newframe->frame_num);
+                if(!pte->PRESENT){   // pagefault
+                    pagefault_handler(pte, vpage);
                 }
+                pte->MODIFIED = 1;
                 break;
             case 'e':
                 in >> procid;
@@ -276,19 +259,17 @@ int main(int argc, char *argv[]){
     string input_file, rand_file;
     parse_args(argc, argv, input_file, rand_file);
 
+    // initialize frame_table and free_pool
+    frame_table.resize(num_frames);
     for(int i = 0; i < num_frames; i++){
-        frame_t* f = new frame_t;
-        f->frame_num = i;
-        f->is_mapped = false;
-        free_pool.push_back(f);
+        frame_table[i].frame_num = i;
+        frame_table[i].is_mapped = false;
+        frame_table[i].rev_map = make_pair(nullptr, -1);
+        free_pool.push_back(&frame_table[i]);
     }
 
     parse_random(rand_file);
     parse_input(input_file);
-
-    // for(int i = 0; i < 105; i++){
-    //     printf("%d\n", myrandom(100));
-    // }
 
     return 0;
 }

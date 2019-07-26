@@ -134,7 +134,6 @@ void print_free_pool(){
 void pagefault_handler(pte_t *pte, int vpage){
     frame_t* newframe = get_frame();
 
-    /*----------unmap old frame and save it if needed----*/
     if(newframe->is_mapped){    // unmap old frame
         printf("UNMAP %d:%d\n", newframe->rev_map.first->pid, newframe->rev_map.second);
         cost = cost + execution_time[MAP_UNMAP];
@@ -143,30 +142,37 @@ void pagefault_handler(pte_t *pte, int vpage){
         if(old_pte->REFERENCED){
 
         }
-        if(old_pte->MODIFIED){  // save changes to disk OUT/FOUT
-            printf("OUT\n");
-            cost = cost + execution_time[PAGEIN_OUT];
-            current_process->stats->outs += 1;
+        if(old_pte->MODIFIED){  // dirty. save changes to disk OUT/FOUT
+            if(old_pte->FILE_MAPPED){
+                printf("FOUT\n");
+                cost = cost + execution_time[FILEIN_OUT];
+                current_process->stats->fouts += 1;
+            } else {
+                printf("OUT\n");
+                cost = cost + execution_time[PAGEIN_OUT];
+                current_process->stats->outs += 1;
+            }
+            old_pte->PAGEDOUT = 1;
         }
+        old_pte->PRESENT = 0;
         newframe->is_mapped = false;
         newframe->rev_map = make_pair(nullptr, -1);
     }
-    /*----------------------------------------------------*/
+
+    if(!pte->PAGEDOUT){     // zero out the virtual page
+        pte->PRESENT = 0;
+        pte->MODIFIED = 0;
+        pte->REFERENCED = 0;
+        pte->INDEX = 0;
+        pte->PAGEDOUT = 0;
+        printf("ZERO\n");
+        cost = cost + execution_time[ZEROING_PAGE];
+        current_process->stats->zeros += 1;
+    }
+    
 
 
-    /*------zero out the virtual page------*/ 
-    pte->PRESENT = 0;
-    pte->MODIFIED = 0;
-    pte->REFERENCED = 0;
-    // pte->INDEX = -1;
-    // pte->PAGEDOUT = 0;   // to reset or not?
-    printf("ZERO\n");
-    cost = cost + execution_time[ZEROING_PAGE];
-    current_process->stats->zeros += 1;
-    /*-------------------------------------*/
-
-
-    /*-------map newframe to vpage of current_process-----*/
+    // map newframe to vpage of current_process
     pte->PRESENT = 1;
     pte->INDEX = newframe->frame_num;
     newframe->is_mapped = true;
@@ -174,7 +180,7 @@ void pagefault_handler(pte_t *pte, int vpage){
     printf("MAP %d\n", pte->INDEX);
     cost = cost + execution_time[MAP_UNMAP];
     current_process->stats->maps += 1;
-    /*----------------------------------------------------*/
+
 }
 
 void print_stats(){
@@ -311,6 +317,7 @@ void parse_input(string input_file){
                 if(!pte->PRESENT){   // pagefault
                     pagefault_handler(pte, vpage);
                 }
+                pte->REFERENCED = 1;
                 pte->MODIFIED = 1;
                 cost = cost + execution_time[READ_WRITE];
                 break;

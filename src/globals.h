@@ -30,12 +30,13 @@ int execution_time[] = {
 /*----------------------Data Structures---------------------- */
 typedef struct pte_t{
     unsigned int PRESENT:1;             // PRESENT/VALID bit
-    unsigned int  WRITE_PROTECT:1;
-    unsigned int  MODIFIED:1;
-    unsigned int  REFERENCED:1;
-    unsigned int  PAGEDOUT:1;
+    unsigned int WRITE_PROTECT:1;
+    unsigned int MODIFIED:1;
+    unsigned int REFERENCED:1;
+    unsigned int PAGEDOUT:1;
     unsigned int INDEX:7;
-    pte_t(): PRESENT(0), WRITE_PROTECT(0), MODIFIED(0), REFERENCED(0), PAGEDOUT(0), INDEX(0){}
+    unsigned int FILE_MAPPED:1;
+    pte_t(): PRESENT(0), WRITE_PROTECT(0), MODIFIED(0), REFERENCED(0), PAGEDOUT(0), INDEX(0), FILE_MAPPED(0){}
     // used 12 bits. free to use remaining 20 bits however.
 } pte_t;
 

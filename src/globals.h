@@ -3,6 +3,30 @@
 
 #define NUM_PTE 64
 
+typedef enum {
+    MAP_UNMAP,
+    PAGEIN_OUT,
+    FILEIN_OUT,
+    ZEROING_PAGE,
+    SEGV,
+    SEGPROT,
+    READ_WRITE,
+    CONTEXT_SWITCH,
+    PROCESS_EXIT
+} execution_type_t;
+
+int execution_time[] = {
+    400,    // [0] - map/unmap
+    3000,   // [1] - page-in/out
+    2500,   // [2] - file-in/out
+    150,    // [3] - zeroing out a page
+    240,    // [4] - segv
+    300,    // [5] - segprot
+    1,      // [6] - read/write
+    121,    // [7] - context switch
+    175     // [8] - process exit
+};
+
 /*----------------------Data Structures---------------------- */
 typedef struct pte_t{
     unsigned int PRESENT:1;             // PRESENT/VALID bit
@@ -22,16 +46,18 @@ typedef struct{
     bool file_mapped;
 } vmaspec;
 
-typedef struct{
+typedef struct pstat_t{
     unsigned long unmaps;
     unsigned long maps;
     unsigned long ins;
     unsigned long outs;
     unsigned long fins;
     unsigned long fouts;
-    unsigned long zeroes;
+    unsigned long zeros;
     unsigned long segv;
     unsigned long segprot;
+    pstat_t(): unmaps(0), maps(0), ins(0), outs(0),
+    fins(0), fouts(0), zeros(0), segv(0), segprot(0){}
 } pstat_t;
 
 class Process

@@ -15,7 +15,7 @@ using namespace std;
 // int num_pte = 64;
 int num_frames = 128;
 
-bool testing = true;
+bool testing = false;
 long rand_ofs = 0;
 vector<long> randvals;
 vector<pte_t> page_table;
@@ -28,6 +28,9 @@ Process *current_process;
 // TOTALCOST stats
 unsigned long long cost = 0;
 unsigned long inst_count = 0, ctx_switches = 0, process_exits = 0;
+
+bool print_output = false, print_pt = false, print_ft = false, print_procstats = false;
+bool opt_x = false, opt_y = false, opt_f = false, opt_a = false;
 
 Pager *pager = (Pager *) new FIFO();
 
@@ -72,12 +75,38 @@ void parse_args(int argc, char *argv[], string &input_file, string &rand_file){
             case 'o':
                 char *options;
                 options = optarg;
+                for(char* it = options; *it; ++it) {
+                    switch(*it){
+                        case 'O': 
+                            print_output = true;
+                            break;
+                        case 'P':
+                            print_pt = true;
+                            break;
+                        case 'F':
+                            print_ft = true;
+                            break;
+                        case 'S':
+                            print_procstats = true;
+                            break;
+                        case 'x':
+                            opt_x = true;
+                            break;
+                        case 'y':
+                            opt_y = true;
+                            break;
+                        case 'f':
+                            opt_f = true;
+                            break;
+                        case 'a':
+                            opt_a = true;
+                            break;
+                    }
+                }
                 if(testing) printf("options: %s\n", options);
                 break;
             case 'f':
-                // int num_frames;
                 num_frames = atoi(optarg);
-                // frame_table.resize(num_frames);
                 if(testing) printf("num_frames: %d\n", num_frames);
                 break;
             case '?':
@@ -124,67 +153,90 @@ frame_t* get_frame() {
     return frame;
 }
 
-void print_free_pool(){
-    printf("Free Frames: \n");
-    for(deque<frame_t*>::iterator iter = free_pool.begin(); iter != free_pool.end(); ++iter){
-        printf("frame %d\n", (*iter)->frame_num);
-    }
-}
-
 void pagefault_handler(pte_t *pte, int vpage){
+    
+    // check if pte part of VMA
+    if(!pte->VMA_CHECK){
+        for(int i = 0; i < current_process->num_vma; i++){
+            if(vpage >= current_process->vma_specs[i].start_vpage && vpage <= current_process->vma_specs[i].end_vpage){
+                pte->VMA_ASSIGNED = 1;
+                pte->WRITE_PROTECT = current_process->vma_specs[i].write_protected;
+                pte->FILE_MAPPED = current_process->vma_specs[i].file_mapped;
+            }
+        }
+        pte->VMA_CHECK = 1;
+    }
+    if(!pte->VMA_ASSIGNED){
+        if(print_output) printf(" SEGV\n");
+        cost = cost + execution_time[READ_WRITE];
+        cost = cost + execution_time[SEGV];
+        current_process->stats->segv += 1;
+        return;
+    }
+    
     frame_t* newframe = get_frame();
 
     if(newframe->is_mapped){    // unmap old frame
-        printf("UNMAP %d:%d\n", newframe->rev_map.first->pid, newframe->rev_map.second);
+        Process* old_process = newframe->rev_map.first;
+        pte_t* old_pte = &old_process->page_table[newframe->rev_map.second];
+        if(print_output) printf(" UNMAP %d:%d\n", newframe->rev_map.first->pid, newframe->rev_map.second);
         cost = cost + execution_time[MAP_UNMAP];
-        current_process->stats->unmaps += 1;
-        pte_t* old_pte = &newframe->rev_map.first->page_table[newframe->rev_map.second];
-        if(old_pte->REFERENCED){
+        old_process->stats->unmaps += 1;
 
-        }
         if(old_pte->MODIFIED){  // dirty. save changes to disk OUT/FOUT
             if(old_pte->FILE_MAPPED){
-                printf("FOUT\n");
+                if(print_output) printf(" FOUT\n");
                 cost = cost + execution_time[FILEIN_OUT];
-                current_process->stats->fouts += 1;
+                old_process->stats->fouts += 1;
             } else {
-                printf("OUT\n");
+                if(print_output) printf(" OUT\n");
+                old_pte->PAGEDOUT = 1;
                 cost = cost + execution_time[PAGEIN_OUT];
-                current_process->stats->outs += 1;
+                old_process->stats->outs += 1;
             }
-            old_pte->PAGEDOUT = 1;
+            old_pte->MODIFIED = 0;
         }
+
         old_pte->PRESENT = 0;
         newframe->is_mapped = false;
         newframe->rev_map = make_pair(nullptr, -1);
+        
     }
 
-    if(!pte->PAGEDOUT){     // zero out the virtual page
-        pte->PRESENT = 0;
-        pte->MODIFIED = 0;
-        pte->REFERENCED = 0;
-        pte->INDEX = 0;
-        pte->PAGEDOUT = 0;
-        printf("ZERO\n");
-        cost = cost + execution_time[ZEROING_PAGE];
-        current_process->stats->zeros += 1;
+    if(pte->FILE_MAPPED){
+        if(print_output) printf(" FIN\n");
+        cost = cost + execution_time[FILEIN_OUT];
+        current_process->stats->fins += 1;
+    } else {
+        if(pte->PAGEDOUT){
+            if(print_output) printf(" IN\n");
+            cost = cost + execution_time[PAGEIN_OUT];
+            current_process->stats->ins += 1;
+        } else {
+            pte->PRESENT = 0;
+            pte->MODIFIED = 0;
+            pte->REFERENCED = 0;
+            pte->INDEX = 0;
+            pte->PAGEDOUT = 0;
+            if(print_output) printf(" ZERO\n");
+            cost = cost + execution_time[ZEROING_PAGE];
+            current_process->stats->zeros += 1;
+        }
     }
     
-
-
     // map newframe to vpage of current_process
     pte->PRESENT = 1;
     pte->INDEX = newframe->frame_num;
     newframe->is_mapped = true;
     newframe->rev_map = make_pair(current_process, vpage);
-    printf("MAP %d\n", pte->INDEX);
+    if(print_output) printf(" MAP %d\n", pte->INDEX);
     cost = cost + execution_time[MAP_UNMAP];
     current_process->stats->maps += 1;
 
 }
 
 void print_stats(){
-    if(true){   // print the page table info of each process
+    if(print_pt){   // print the page table info of each process
         Process* p;
         pte_t* ptable;
         for(int i = 0; i < processes.size(); i++){
@@ -211,7 +263,7 @@ void print_stats(){
         p = nullptr;
         ptable = nullptr;
     }
-    if(true){   // print frame table info
+    if(print_ft){   // print frame table info
         frame_t * fte;
         printf("FT: ");
         for(int i = 0; i < frame_table.size(); i++){
@@ -225,20 +277,22 @@ void print_stats(){
         printf("\n");
         fte = nullptr;
     }
-    Process* proc;
-    pstat_t* pstats;
-    for(int i = 0; i < processes.size(); i++){
-        proc = processes[i];
-        pstats = proc->stats;
-        printf("PROC[%d]: U=%lu M=%lu I=%lu O=%lu FI=%lu FO=%lu Z=%lu SV=%lu SP=%lu\n",
-            proc->pid,
-            pstats->unmaps, pstats->maps, pstats->ins, pstats->outs,
-            pstats->fins, pstats->fouts, pstats->zeros,
-            pstats->segv, pstats->segprot);
+    if(print_procstats){    // print stats
+        Process* proc;
+        pstat_t* pstats;
+        for(int i = 0; i < processes.size(); i++){
+            proc = processes[i];
+            pstats = proc->stats;
+            printf("PROC[%d]: U=%lu M=%lu I=%lu O=%lu FI=%lu FO=%lu Z=%lu SV=%lu SP=%lu\n",
+                proc->pid,
+                pstats->unmaps, pstats->maps, pstats->ins, pstats->outs,
+                pstats->fins, pstats->fouts, pstats->zeros,
+                pstats->segv, pstats->segprot);
+        }
+        printf("TOTALCOST %lu %lu %lu %llu\n", inst_count, ctx_switches, process_exits, cost);
+        proc = nullptr;
+        pstats = nullptr;
     }
-    printf("TOTALCOST %lu %lu %lu %llu\n", inst_count, ctx_switches, process_exits, cost);
-    proc = nullptr;
-    pstats = nullptr;
 }
 
 void parse_input(string input_file){
@@ -279,13 +333,10 @@ void parse_input(string input_file){
             }
         }
     }
-    
-    // print_free_pool();
 
     // parse instructions
     char c;
     pte_t *pte;
-    // unsigned long long counter = 0;
     while(in >> c){
         if(c == '#'){
             in.ignore(numeric_limits<streamsize>::max(), '\n');
@@ -296,43 +347,87 @@ void parse_input(string input_file){
             case 'c':   // context switch
                 in >> procid;
                 current_process = processes[procid];
-                printf("%lu: ==> %c %d\n", inst_count, c, procid);
+                if(print_output) printf("%lu: ==> %c %d\n", inst_count, c, procid);
                 ctx_switches = ctx_switches + 1;
                 cost = cost + execution_time[CONTEXT_SWITCH];
                 break;
             case 'r':   // read
                 in >> vpage;
                 pte = &current_process->page_table[vpage];
-                printf("%lu: ==> %c %d\n", inst_count, c, vpage);
+                if(print_output) printf("%lu: ==> %c %d\n", inst_count, c, vpage);
                 if(!pte->PRESENT){   // pagefault
                     pagefault_handler(pte, vpage);
                 }
-                pte->REFERENCED = 1;
-                cost = cost + execution_time[READ_WRITE];
+                if(pte->VMA_ASSIGNED){
+                    pte->REFERENCED = 1;
+                    cost = cost + execution_time[READ_WRITE];
+                }
                 break;
             case 'w':   // write
                 in >> vpage;
                 pte = &current_process->page_table[vpage];
-                printf("%lu: ==> %c %d\n", inst_count, c, vpage);
+                if(print_output) printf("%lu: ==> %c %d\n", inst_count, c, vpage);
                 if(!pte->PRESENT){   // pagefault
                     pagefault_handler(pte, vpage);
                 }
-                pte->REFERENCED = 1;
-                pte->MODIFIED = 1;
-                cost = cost + execution_time[READ_WRITE];
+                if(pte->VMA_ASSIGNED){
+                    if(pte->WRITE_PROTECT){
+                        if(print_output) printf(" SEGPROT\n");
+                        pte->REFERENCED = 1;
+                        current_process->stats->segprot += 1;
+                        cost = cost + execution_time[READ_WRITE];
+                        cost = cost + execution_time[SEGPROT];
+                    } else {
+                        pte->REFERENCED = 1;
+                        pte->MODIFIED = 1;
+                        cost = cost + execution_time[READ_WRITE];
+                    }
+                }
                 break;
             case 'e':
                 in >> procid;
-                printf("%lu: ==> %c %d\n", inst_count, c, procid);
+                if(print_output) printf("%lu: ==> %c %d\n", inst_count, c, procid);
+                
+                printf("EXIT current process %d\n", current_process->pid);
                 process_exits = process_exits + 1;
                 cost = cost + execution_time[PROCESS_EXIT];
+                
+                // loop through all pte of current process and unmap all valid 
+                for(int i = 0; i < NUM_PTE; i++){
+                    pte = &current_process->page_table[i];
+                    
+                    if(pte->PRESENT){
+
+                        if(print_output) printf(" UNMAP %d:%d\n", current_process->pid, i);
+                        cost = cost + execution_time[MAP_UNMAP];
+                        current_process->stats->unmaps += 1;
+                        frame_t* fte = &frame_table[pte->INDEX];
+                        fte->is_mapped = false;
+                        fte->rev_map = make_pair(nullptr, -1);
+
+                        if(pte->MODIFIED && pte->FILE_MAPPED){
+                            if(print_output) printf(" FOUT\n");
+                            cost = cost + execution_time[FILEIN_OUT];
+                            current_process->stats->fouts += 1;
+                            pte->MODIFIED = 0;
+                        }
+                        
+                        free_pool.push_back(fte);
+                        fte = nullptr;
+
+                        pte->PRESENT = 0;
+                    }
+                    pte->MODIFIED = 0;
+                    pte->REFERENCED = 0;
+                    pte->PAGEDOUT = 0;
+                }
                 break;
             default: break;
         }
         in.ignore(numeric_limits<streamsize>::max(), '\n');
         inst_count = inst_count + 1;
     }
-    // cost = (inst_count - ctx_switches - process_exits) + ctx_switches *
+    pte = nullptr;
     print_stats();
     in.close();
 }

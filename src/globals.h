@@ -36,7 +36,10 @@ typedef struct pte_t{
     unsigned int PAGEDOUT:1;
     unsigned int INDEX:7;
     unsigned int FILE_MAPPED:1;
-    pte_t(): PRESENT(0), WRITE_PROTECT(0), MODIFIED(0), REFERENCED(0), PAGEDOUT(0), INDEX(0), FILE_MAPPED(0){}
+    unsigned int VMA_CHECK:1;
+    unsigned int VMA_ASSIGNED:1;
+    pte_t(): PRESENT(0), WRITE_PROTECT(0), MODIFIED(0), REFERENCED(0),
+     PAGEDOUT(0), INDEX(0), FILE_MAPPED(0), VMA_CHECK(0), VMA_ASSIGNED(0){}
     // used 12 bits. free to use remaining 20 bits however.
 } pte_t;
 

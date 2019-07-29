@@ -17,7 +17,7 @@
 
 using namespace std;
 
-bool testing = false;
+bool testing = false;   // Only for printing test info. keep it false.
 int num_frames = 128;
 long rand_ofs = 0;
 vector<long> randvals;
@@ -265,47 +265,59 @@ void pagefault_handler(pte_t *pte, int vpage){
 
 }
 
+void print_page_table(Process* p){
+    pte_t* ptable;
+    ptable = p->page_table;
+    printf("PT[%d]: ", p->pid);
+    for(int j = 0; j < NUM_PTE; j++){
+        if(!ptable[j].PRESENT){
+            if(ptable[j].PAGEDOUT) printf("# ");
+            else printf("* ");
+        } else {
+            printf("%d:", j);
+            if(ptable[j].REFERENCED) printf("R");
+            else printf("-");
+            if(ptable[j].MODIFIED) printf("M");
+            else printf("-");
+            if(ptable[j].PAGEDOUT) printf("S");
+            else printf("-");
+            printf(" ");
+        }
+    }
+    printf("\n");
+    ptable = nullptr;
+}
+
+void print_pt_allproc(){
+    Process* p;
+    for(int i = 0; i < processes.size(); i++){
+        p = processes[i];
+        print_page_table(p);
+    }
+    p = nullptr;
+}
+
+void print_frame_table(){
+    frame_t * fte;
+    printf("FT: ");
+    for(int i = 0; i < frame_table.size(); i++){
+        fte = &frame_table[i];
+        if(fte->is_mapped){
+            printf("%d:%d ", fte->rev_map.first->pid, fte->rev_map.second);
+        } else {
+            printf("* ");
+        }
+    }
+    printf("\n");
+    fte = nullptr;
+}
+
 void print_stats(){
     if(print_pt){   // print the page table info of each process
-        Process* p;
-        pte_t* ptable;
-        for(int i = 0; i < processes.size(); i++){
-            p = processes[i];
-            ptable = p->page_table;
-            printf("PT[%d]: ", i);
-            for(int j = 0; j < NUM_PTE; j++){
-                if(!ptable[j].PRESENT){
-                    if(ptable[j].PAGEDOUT) printf("# ");
-                    else printf("* ");
-                } else {
-                    printf("%d:", j);
-                    if(ptable[j].REFERENCED) printf("R");
-                    else printf("-");
-                    if(ptable[j].MODIFIED) printf("M");
-                    else printf("-");
-                    if(ptable[j].PAGEDOUT) printf("S");
-                    else printf("-");
-                    printf(" ");
-                }
-            }
-            printf("\n");
-        }
-        p = nullptr;
-        ptable = nullptr;
+        print_pt_allproc();
     }
     if(print_ft){   // print frame table info
-        frame_t * fte;
-        printf("FT: ");
-        for(int i = 0; i < frame_table.size(); i++){
-            fte = &frame_table[i];
-            if(fte->is_mapped){
-                printf("%d:%d ", fte->rev_map.first->pid, fte->rev_map.second);
-            } else {
-                printf("* ");
-            }
-        }
-        printf("\n");
-        fte = nullptr;
+        print_frame_table();
     }
     if(print_procstats){    // print stats
         Process* proc;
@@ -456,6 +468,9 @@ void parse_input(string input_file){
         }
         in.ignore(numeric_limits<streamsize>::max(), '\n');
         inst_count = inst_count + 1;
+        if(opt_x) print_page_table(current_process);
+        if(opt_y) print_pt_allproc();
+        if(opt_f) print_frame_table();
     }
     pte = nullptr;
     print_stats();

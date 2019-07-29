@@ -2,12 +2,10 @@
 
 class Random : public Pager
 {
-private:
-    int hand;
-public:
-    Random();
-    ~Random();
-    frame_t* select_victim_frame();
+    public:
+        Random();
+        ~Random();
+        frame_t* select_victim_frame();
 };
 
 Random::Random(){
@@ -19,6 +17,6 @@ Random::~Random(){
 }
 
 frame_t* Random::select_victim_frame(){
-    frame_t* frame = &frame_table[myrandom(num_frames)];
+    frame_t* frame = &frame_table[myrandom(frame_table.size())];
     return frame;
 }

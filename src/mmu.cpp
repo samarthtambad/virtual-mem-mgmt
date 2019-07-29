@@ -9,17 +9,19 @@
 #include "globals.h"
 #include "pagers/Pager.h"
 #include "pagers/FIFO.h"
+#include "pagers/Random.h"
+#include "pagers/Clock.h"
+#include "pagers/NRU.h"
+#include "pagers/Aging.h"
+#include "pagers/WorkingSet.h"
 
 using namespace std;
 
-// int num_pte = 64;
 int num_frames = 128;
-
 bool testing = false;
 long rand_ofs = 0;
 vector<long> randvals;
 vector<pte_t> page_table;
-// vector<process> processes;
 vector<frame_t> frame_table;   // OS maintains this
 deque<frame_t*> free_pool;
 vector<Process*> processes;
@@ -32,8 +34,7 @@ unsigned long inst_count = 0, ctx_switches = 0, process_exits = 0;
 bool print_output = false, print_pt = false, print_ft = false, print_procstats = false;
 bool opt_x = false, opt_y = false, opt_f = false, opt_a = false;
 
-Pager *pager = (Pager *) new FIFO();
-
+Pager *pager;
 
 void parse_random(string rand_file){
     ifstream in;
@@ -68,9 +69,38 @@ void parse_args(int argc, char *argv[], string &input_file, string &rand_file){
     while ((c = getopt (argc, argv, "a:o:f:")) != -1){
         switch(c){
             case 'a':
-                char *algo;
-                algo = optarg;
-                if(testing) printf("algo %s\n", algo);
+                char algo;
+                algo = optarg[0];
+                if(testing) printf("algo %c\n", algo);
+                switch (algo)
+                {
+                    case 'f':
+                        pager = (Pager *) new FIFO();
+                        if(testing) printf("algo f selected\n");
+                        break;
+                    case 'r':
+                        pager = (Pager *) new Random();
+                        if(testing) printf("algo r selected\n");
+                        break;
+                    case 'c':
+                        pager = (Pager *) new Clock();
+                        if(testing) printf("algo c selected\n");
+                        break;
+                    case 'e':
+                        pager = (Pager *) new NRU();
+                        if(testing) printf("algo e selected\n");
+                        break;
+                    case 'a':
+                        pager = (Pager *) new Aging();
+                        if(testing) printf("algo a selected\n");
+                        break;
+                    case 'w':
+                        pager = (Pager *) new WorkingSet();
+                        if(testing) printf("algo w selected\n");
+                        break;
+                    default:
+                        break;
+                }
                 break;
             case 'o':
                 char *options;

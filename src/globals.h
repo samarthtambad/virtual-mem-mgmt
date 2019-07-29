@@ -92,6 +92,8 @@ typedef struct frame_t{
 } frame_t;
 /*--------------------------------------------------------------*/
 
-extern std::vector<frame_t> frame_table; 
+extern std::vector<frame_t> frame_table;
+extern int num_frames;
+extern int myrandom(int);
 
 #endif

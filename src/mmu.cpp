@@ -17,8 +17,8 @@
 
 using namespace std;
 
-int num_frames = 128;
 bool testing = false;
+int num_frames = 128;
 long rand_ofs = 0;
 vector<long> randvals;
 vector<pte_t> page_table;

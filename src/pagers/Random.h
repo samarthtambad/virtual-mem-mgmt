@@ -19,6 +19,6 @@ Random::~Random(){
 }
 
 frame_t* Random::select_victim_frame(){
-    frame_t* frame = &frame_table[hand];
+    frame_t* frame = &frame_table[myrandom(num_frames)];
     return frame;
 }

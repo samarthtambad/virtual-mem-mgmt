@@ -86,14 +86,16 @@ Process::Process(int pid, int num_vma){
 typedef struct frame_t{
     int frame_num;
     int is_mapped;
+    unsigned int age;
     std::pair<Process*, int> rev_map; // <process, vpage>
     // helper data
-    frame_t() : is_mapped(false){}
+    frame_t() : frame_num(0), is_mapped(false), age(0){}
 } frame_t;
 /*--------------------------------------------------------------*/
 
 extern std::vector<frame_t> frame_table;
 extern unsigned long inst_count;
 extern int myrandom(int);
+extern bool opt_a;
 
 #endif

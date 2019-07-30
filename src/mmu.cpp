@@ -1,5 +1,3 @@
-// #include <stdlib.h>
-// #include <stdio.h>
 #include <string>
 #include <unistd.h>
 #include <fstream>
@@ -18,7 +16,7 @@
 using namespace std;
 
 bool testing = false;   // Only for printing test info. keep it false.
-int num_frames = 128;
+int num_frames = 16;
 long rand_ofs = 0;
 vector<long> randvals;
 vector<pte_t> page_table;
@@ -259,6 +257,7 @@ void pagefault_handler(pte_t *pte, int vpage){
     pte->INDEX = newframe->frame_num;
     newframe->is_mapped = true;
     newframe->rev_map = make_pair(current_process, vpage);
+    newframe->age = 0;
     if(print_output) printf(" MAP %d\n", pte->INDEX);
     cost = cost + execution_time[MAP_UNMAP];
     current_process->stats->maps += 1;

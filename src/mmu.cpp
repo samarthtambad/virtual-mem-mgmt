@@ -361,7 +361,7 @@ void parse_input(string input_file){
         for(int j = 0; j < num_vma; j++){
             in >> proc->vma_specs[j].start_vpage >> proc->vma_specs[j].end_vpage >> proc->vma_specs[j].write_protected >> proc->vma_specs[j].file_mapped;
         }
-        in.ignore(numeric_limits<streamsize>::max(), '\n');
+        in.ignore();
         processes.push_back(proc);
         proc = nullptr;
     }
@@ -381,7 +381,7 @@ void parse_input(string input_file){
     pte_t *pte;
     while(in >> c){
         if(c == '#'){
-            in.ignore(numeric_limits<streamsize>::max(), '\n');
+            in.ignore();
             continue;
         }
         int procid, vpage;
@@ -466,7 +466,7 @@ void parse_input(string input_file){
                 break;
             default: break;
         }
-        in.ignore(numeric_limits<streamsize>::max(), '\n');
+        in.ignore();
         inst_count = inst_count + 1;
         if(opt_x) print_page_table(current_process);
         if(opt_y) print_pt_allproc();

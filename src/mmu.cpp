@@ -3,6 +3,7 @@
 #include <fstream>
 #include <vector>
 #include <queue>
+#include <limits>
 
 #include "globals.h"
 #include "pagers/Pager.h"

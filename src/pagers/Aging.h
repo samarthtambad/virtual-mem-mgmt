@@ -25,8 +25,8 @@ frame_t* Aging::select_victim_frame(){
     int start_scan = 0, end_scan = 0, count = 0;
     unsigned int min_age = 0xFFFFFFFF;
 
-    ref_fte = &frame_table[hand];
-    ref_pte = &ref_fte->rev_map.first->page_table[ref_fte->rev_map.second];
+    // ref_fte = &frame_table[hand];
+    // ref_pte = &ref_fte->rev_map.first->page_table[ref_fte->rev_map.second];
     start_scan = hand;
     end_scan = (start_scan == 0) ? (frame_table.size() - 1) : (start_scan - 1);
 

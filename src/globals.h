@@ -85,11 +85,13 @@ Process::Process(int pid, int num_vma){
 
 typedef struct frame_t{
     int frame_num;
-    int is_mapped;
-    unsigned int age;
     std::pair<Process*, int> rev_map; // <process, vpage>
     // helper data
-    frame_t() : frame_num(0), is_mapped(false), age(0){}
+    int is_mapped;
+    unsigned int age;
+    unsigned int timelastuse;
+    
+    frame_t() : frame_num(0), is_mapped(false), age(0), timelastuse(0){}
 } frame_t;
 /*--------------------------------------------------------------*/
 

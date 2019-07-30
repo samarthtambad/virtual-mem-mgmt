@@ -258,6 +258,7 @@ void pagefault_handler(pte_t *pte, int vpage){
     newframe->is_mapped = true;
     newframe->rev_map = make_pair(current_process, vpage);
     newframe->age = 0;
+    newframe->timelastuse = inst_count;
     if(print_output) printf(" MAP %d\n", pte->INDEX);
     cost = cost + execution_time[MAP_UNMAP];
     current_process->stats->maps += 1;

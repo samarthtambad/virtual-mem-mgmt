@@ -430,7 +430,7 @@ void parse_input(string input_file){
                 in >> procid;
                 if(print_output) printf("%lu: ==> %c %d\n", inst_count, c, procid);
                 
-                printf("EXIT current process %d\n", current_process->pid);
+                if(print_output) printf("EXIT current process %d\n", current_process->pid);
                 process_exits = process_exits + 1;
                 cost = cost + execution_time[PROCESS_EXIT];
                 

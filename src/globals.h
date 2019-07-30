@@ -27,7 +27,9 @@ int execution_time[] = {
     175     // [8] - process exit
 };
 
+
 /*----------------------Data Structures---------------------- */
+
 typedef struct pte_t{
     unsigned int PRESENT:1;             // PRESENT/VALID bit
     unsigned int WRITE_PROTECT:1;
@@ -93,8 +95,11 @@ typedef struct frame_t{
     
     frame_t() : frame_num(0), is_mapped(false), age(0), timelastuse(0){}
 } frame_t;
+
 /*--------------------------------------------------------------*/
 
+
+// global variables
 extern std::vector<frame_t> frame_table;
 extern unsigned long inst_count;
 extern int myrandom(int);
